@@ -1,6 +1,11 @@
-﻿node_modules/
+node_modules/
 .env
 .dart_tool/
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
+*.pdf
+*Proposal*
+*PORTFOLIO*
+build_symbols/
+

@@ -1965,13 +1965,22 @@ app.use(['/api/driver/admin', '/driver/admin'], driverAdminRouter);
 app.use(['/api/driver', '/driver'], driverRouter);
 app.use(['/api', '/'], driverTrackRouter);
 
-// ---------- Health ----------
-app.get('/health', (req, res) => {
-  return res.json({ success: true, message: 'Backend is running' });
-});
-
 // ---------- Static Customer App Web Build (Direct Mobile Access) ----------
 const customerWebDir = path.join(__dirname, '../flutter_apps/customer_app/build/web');
+
+// ---------- Root Route for Cloud Deployment & Health Check ----------
+app.get('/', (req, res) => {
+  if (fs.existsSync(customerWebDir) && req.accepts('html')) {
+    return res.sendFile(path.join(customerWebDir, 'index.html'));
+  }
+  return res.status(200).json({ status: 'active', message: 'Rameez Kitchen API is live' });
+});
+
+// ---------- Health ----------
+app.get(['/health', '/api/health'], (req, res) => {
+  return res.status(200).json({ status: 'active', success: true, message: 'Backend is running' });
+});
+
 if (fs.existsSync(customerWebDir)) {
   app.use(express.static(customerWebDir));
   app.get('*', (req, res, next) => {
@@ -1981,6 +1990,21 @@ if (fs.existsSync(customerWebDir)) {
     res.sendFile(path.join(customerWebDir, 'index.html'));
   });
 }
+
+// ---------- 404 & Unhandled Error Handlers for Clean Deployment ----------
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/driver')) {
+    return res.status(404).json({ error: 'Endpoint not found', path: req.originalUrl });
+  }
+  next();
+});
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled server error:', err);
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : (err.message || 'Internal server error'),
+  });
+});
 
 server.listen(PORT, () => {
   console.log(`✓ Master Server online on :${PORT}`);
