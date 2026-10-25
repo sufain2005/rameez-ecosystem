@@ -4,9 +4,10 @@ class ApiConstants {
   ApiConstants._();
 
   /// Set at build time:
-  ///   flutter run --dart-define=API_BASE_URL=http://192.168.1.10:5000/api
-  ///   flutter build apk --dart-define=API_BASE_URL=https://api.yourdomain.com/api
   static const String _override = String.fromEnvironment('API_BASE_URL');
+  
+  /// YOUR LIVE RENDER BACKEND URL:
+  static const String _renderProductionUrl = 'https://rameez-kitchen-backend.onrender.com';
 
   static String get serverHost {
     if (kIsWeb) {
@@ -34,8 +35,10 @@ class ApiConstants {
       }
       url = _override;
     } else if (kReleaseMode) {
-      throw StateError('API_BASE_URL is required for release builds.');
+      // Automatically use the live Render URL when building for production
+      url = _renderProductionUrl;
     } else {
+      // Use local environment for debugging
       url = serverBaseUrl;
     }
 
