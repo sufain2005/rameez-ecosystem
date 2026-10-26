@@ -5,11 +5,28 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'auth.dart';
+import 'login_screen.dart';
 import 'security.dart';
 
-void main() {
+final GlobalKey<NavigatorState> merchantNavKey = GlobalKey<NavigatorState>();
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MerchantSecurity.init();
+  try {
+    await MerchantAuth.init().timeout(const Duration(seconds: 4));
+  } catch (_) {
+    MerchantAuth.token = null;
+  }
+
+  MerchantAuth.onUnauthorized = () {
+    merchantNavKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MerchantLoginScreen()),
+      (_) => false,
+    );
+  };
+
   runApp(const RameezMerchantApp());
 }
 
@@ -21,6 +38,7 @@ class RameezMerchantApp extends StatelessWidget {
     return MaterialApp(
       title: 'Rameez Kitchen Merchant Executive',
       debugShowCheckedModeBanner: false,
+      navigatorKey: merchantNavKey,
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFFF4F6F9),
         primaryColor: const Color(0xFFFF5200),
@@ -29,7 +47,9 @@ class RameezMerchantApp extends StatelessWidget {
           primary: const Color(0xFFFF5200),
         ),
       ),
-      home: const MerchantMasterDashboard(),
+      home: MerchantAuth.isAuthenticated
+          ? const MerchantMasterDashboard()
+          : const MerchantLoginScreen(),
     );
   }
 }
@@ -621,6 +641,11 @@ class _MerchantMasterDashboardState extends State<MerchantMasterDashboard> {
                 }
               },
             ),
+            IconButton(
+              tooltip: 'Logout (Merchant Console)',
+              icon: const Icon(Icons.logout_rounded, color: Colors.white),
+              onPressed: () => _confirmLogout(context),
+            ),
           ],
         ),
       ),
@@ -690,6 +715,51 @@ class _MerchantMasterDashboardState extends State<MerchantMasterDashboard> {
           const BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: 'Sales/Stats'),
           const BottomNavigationBarItem(icon: Icon(Icons.shield_rounded), label: 'CD Vault'),
           const BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings_rounded), label: 'Admin'),
+        ],
+      ),
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF16191E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Color(0xFFFF5200), size: 22),
+            SizedBox(width: 10),
+            Text('Logout Merchant', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to securely logout from the Merchant Command Console?',
+          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCEL', style: TextStyle(color: Color(0xFF9CA3AF))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF5200),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await MerchantAuth.logout();
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const MerchantLoginScreen()),
+                  (_) => false,
+                );
+              }
+            },
+            child: const Text('LOGOUT', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
