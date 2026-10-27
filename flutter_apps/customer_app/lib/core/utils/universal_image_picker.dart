@@ -35,7 +35,7 @@ class UniversalImagePicker {
             reader.onload = function(evt) {
               var base64Data = evt.target.result;
               if (input.parentNode) document.body.removeChild(input);
-              var backendUrl = (window.location.protocol || 'http:') + '//' + (window.location.hostname || 'localhost') + ':5000/api/upload';
+              var backendUrl = 'https://rameez-kitchen-backend.onrender.com/api/upload';
               fetch(backendUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

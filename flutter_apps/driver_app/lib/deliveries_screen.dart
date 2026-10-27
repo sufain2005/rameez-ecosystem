@@ -87,7 +87,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with SingleTickerPr
 
   void initSocket() {
     try {
-      socket = IO.io('http://localhost:5000', <String, dynamic>{
+      socket = IO.io('https://rameez-kitchen-backend.onrender.com', <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': true,
       });

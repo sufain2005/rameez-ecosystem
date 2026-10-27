@@ -89,7 +89,7 @@ class UniversalImagePicker {
             reader.onload = function(evt) {
               var base64Data = evt.target.result;
               if (input.parentNode) document.body.removeChild(input);
-              fetch('http://localhost:5000/api/upload', {
+              fetch('https://rameez-kitchen-backend.onrender.com/api/upload', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ image: base64Data, name: file.name })
@@ -487,7 +487,7 @@ class _MerchantMasterDashboardState extends State<MerchantMasterDashboard> {
 
   Future<void> _fetchPersistedOrders() async {
     try {
-      final res = await http.get(Uri.parse('http://localhost:5000/api/orders'));
+      final res = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/orders'));
       if (res.statusCode == 200 && mounted) {
         final List list = jsonDecode(res.body);
         final Map<String, Map<String, dynamic>> dedup = {};
@@ -504,7 +504,7 @@ class _MerchantMasterDashboardState extends State<MerchantMasterDashboard> {
   }
 
   void initSockets() {
-    socket = IO.io('http://localhost:5000', <String, dynamic>{
+    socket = IO.io('https://rameez-kitchen-backend.onrender.com', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': true,
     });
@@ -1332,7 +1332,7 @@ class _OrdersPipelineViewState extends State<OrdersPipelineView> {
                         setState(() => o['status'] = 'PREPARING');
                         widget.socket.emit('order:status_update', {'orderId': orderId, 'status': 'PREPARING'});
                         http.post(
-                          Uri.parse('http://localhost:5000/api/orders/$orderId/status'),
+                          Uri.parse('https://rameez-kitchen-backend.onrender.com/api/orders/$orderId/status'),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode({'status': 'PREPARING'}),
                         ).catchError((_) => http.Response('', 500));
@@ -1361,7 +1361,7 @@ class _OrdersPipelineViewState extends State<OrdersPipelineView> {
                           'message': 'Order #$orderId is cooked and packed! Ready for pickup at kitchen.',
                         });
                         http.post(
-                          Uri.parse('http://localhost:5000/api/orders/$orderId/status'),
+                          Uri.parse('https://rameez-kitchen-backend.onrender.com/api/orders/$orderId/status'),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode({'status': 'READY_FOR_PICKUP'}),
                         ).catchError((_) => http.Response('', 500));
@@ -1393,7 +1393,7 @@ class _OrdersPipelineViewState extends State<OrdersPipelineView> {
                         setState(() => o['status'] = 'PICKED_UP');
                         widget.socket.emit('order:status_update', {'orderId': orderId, 'status': 'PICKED_UP', 'isDriverEnRoute': true});
                         http.post(
-                          Uri.parse('http://localhost:5000/api/orders/$orderId/status'),
+                          Uri.parse('https://rameez-kitchen-backend.onrender.com/api/orders/$orderId/status'),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode({'status': 'PICKED_UP'}),
                         ).catchError((_) => http.Response('', 500));
@@ -1587,7 +1587,7 @@ class _MenuInventoryManagementViewState extends State<MenuInventoryManagementVie
 
   Future<void> fetchMenu() async {
     try {
-      final res = await http.get(Uri.parse('http://localhost:5000/api/menu'));
+      final res = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/menu'));
       if (res.statusCode == 200 && mounted) {
         setState(() {
           menu = jsonDecode(res.body);
@@ -1601,7 +1601,7 @@ class _MenuInventoryManagementViewState extends State<MenuInventoryManagementVie
 
   Future<void> _toggleAvailability(int id, bool val) async {
     await http.put(
-      Uri.parse('http://localhost:5000/api/menu/$id'),
+      Uri.parse('https://rameez-kitchen-backend.onrender.com/api/menu/$id'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'available': val}),
     );
@@ -1609,7 +1609,7 @@ class _MenuInventoryManagementViewState extends State<MenuInventoryManagementVie
   }
 
   Future<void> _deleteDish(int id) async {
-    await http.delete(Uri.parse('http://localhost:5000/api/menu/$id'));
+    await http.delete(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/menu/$id'));
     fetchMenu();
   }
 
@@ -1675,7 +1675,7 @@ class _MenuInventoryManagementViewState extends State<MenuInventoryManagementVie
               onPressed: () async {
                 if (nameCtrl.text.trim().isEmpty) return;
                 await http.post(
-                  Uri.parse('http://localhost:5000/api/menu'),
+                  Uri.parse('https://rameez-kitchen-backend.onrender.com/api/menu'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({
                     'name': nameCtrl.text.trim(),
@@ -1777,13 +1777,13 @@ class _TodaysOfferManagerViewState extends State<TodaysOfferManagerView> {
   }
 
   Future<void> fetchOffers() async {
-    final res = await http.get(Uri.parse('http://localhost:5000/api/offers'));
+    final res = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/offers'));
     if (res.statusCode == 200 && mounted) setState(() => offers = jsonDecode(res.body));
   }
 
   Future<void> _broadcast() async {
     await http.post(
-      Uri.parse('http://localhost:5000/api/merchant/broadcast-offer'),
+      Uri.parse('https://rameez-kitchen-backend.onrender.com/api/merchant/broadcast-offer'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'code': _code.text, 'offerText': _desc.text, 'discount': _disc.text}),
     );
@@ -1791,7 +1791,7 @@ class _TodaysOfferManagerViewState extends State<TodaysOfferManagerView> {
   }
 
   Future<void> _delete(String id) async {
-    await http.delete(Uri.parse('http://localhost:5000/api/merchant/offers/$id'));
+    await http.delete(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/merchant/offers/$id'));
     fetchOffers();
   }
 
@@ -1864,7 +1864,7 @@ class _SalesAnalyticsViewState extends State<SalesAnalyticsView> {
   Future<void> _fetchLiveAnalytics() async {
     setState(() => _loading = true);
     try {
-      final res = await http.get(Uri.parse('http://localhost:5000/api/analytics'));
+      final res = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/analytics'));
       if (res.statusCode == 200 && mounted) {
         setState(() {
           _analyticsData = jsonDecode(res.body);
@@ -1912,7 +1912,7 @@ class _SalesAnalyticsViewState extends State<SalesAnalyticsView> {
     if (confirmed == true) {
       setState(() => _loading = true);
       try {
-        final res = await http.post(Uri.parse('http://localhost:5000/api/analytics/reset-today'));
+        final res = await http.post(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/analytics/reset-today'));
         if (res.statusCode == 200) {
           widget.onRefresh();
           await _fetchLiveAnalytics();
@@ -2354,7 +2354,7 @@ class _ExecutiveVaultViewState extends State<ExecutiveVaultView> with SingleTick
     });
     try {
       final res = await http.post(
-        Uri.parse('http://localhost:5000/api/admin/verify-vault'),
+        Uri.parse('https://rameez-kitchen-backend.onrender.com/api/admin/verify-vault'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'passkey': _keyCtrl.text.trim()}),
       );
@@ -2382,7 +2382,7 @@ class _ExecutiveVaultViewState extends State<ExecutiveVaultView> with SingleTick
 
   Future<void> _fetchReviews() async {
     try {
-      final res = await http.get(Uri.parse('http://localhost:5000/api/feedback'));
+      final res = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/feedback'));
       if (res.statusCode == 200 && mounted) {
         final data = jsonDecode(res.body);
         setState(() {
@@ -2395,7 +2395,7 @@ class _ExecutiveVaultViewState extends State<ExecutiveVaultView> with SingleTick
   Future<void> _fetchSyncTelemetry() async {
     setState(() => _isSyncing = true);
     try {
-      final res = await http.get(Uri.parse('http://localhost:5000/api/admin/sync-telemetry'));
+      final res = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/admin/sync-telemetry'));
       if (res.statusCode == 200 && mounted) {
         final data = jsonDecode(res.body);
         setState(() {
@@ -2521,7 +2521,7 @@ class _ExecutiveVaultViewState extends State<ExecutiveVaultView> with SingleTick
     if (confirm != true) return;
 
     try {
-      final res = await http.delete(Uri.parse('http://localhost:5000/api/admin/drivers/$driverId'));
+      final res = await http.delete(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/admin/drivers/$driverId'));
       if (res.statusCode == 200) {
         if (mounted) {
           setState(() {
@@ -3837,8 +3837,8 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
 
   Future<void> fetchAdminData() async {
     try {
-      final res = await http.get(Uri.parse('http://localhost:5000/api/merchant/init'));
-      final logRes = await http.get(Uri.parse('http://localhost:5000/api/admin/audit-logs'));
+      final res = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/merchant/init'));
+      final logRes = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/admin/audit-logs'));
       if (res.statusCode == 200 && mounted) {
         final data = jsonDecode(res.body);
         setState(() {
@@ -3879,7 +3879,7 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
 
     try {
       await http.post(
-        Uri.parse('http://localhost:5000/api/merchant/branch-toggle'),
+        Uri.parse('https://rameez-kitchen-backend.onrender.com/api/merchant/branch-toggle'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'branchKey': branchKey, 'isOpen': isOpen}),
       );
@@ -3908,7 +3908,7 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
 
     try {
       await http.post(
-        Uri.parse('http://localhost:5000/api/merchant/branch-update'),
+        Uri.parse('https://rameez-kitchen-backend.onrender.com/api/merchant/branch-update'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'branchKey': branchKey,
@@ -4013,7 +4013,7 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
                 };
 
                 await http.post(
-                  Uri.parse('http://localhost:5000/api/merchant/branch-update'),
+                  Uri.parse('https://rameez-kitchen-backend.onrender.com/api/merchant/branch-update'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode(payload),
                 );
@@ -4074,7 +4074,7 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
     if (result == true && passCtrl.text.isNotEmpty) {
       try {
         final res = await http.post(
-          Uri.parse('http://localhost:5000/api/admin/audit-logs/clear'),
+          Uri.parse('https://rameez-kitchen-backend.onrender.com/api/admin/audit-logs/clear'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'passkey': passCtrl.text.trim()}),
         );
@@ -4114,7 +4114,7 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
 
     try {
       final res = await http.post(
-        Uri.parse('http://localhost:5000/api/admin/profile'),
+        Uri.parse('https://rameez-kitchen-backend.onrender.com/api/admin/profile'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       );
@@ -4244,7 +4244,7 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
               onPressed: () async {
                 final numVal = int.tryParse(valCtrl.text) ?? currentVal;
                 final res = await http.post(
-                  Uri.parse('http://localhost:5000/api/settings/payment-update'),
+                  Uri.parse('https://rameez-kitchen-backend.onrender.com/api/settings/payment-update'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({
                     field: numVal,

@@ -19,11 +19,15 @@ class ApiConstants {
 
   static String get serverBaseUrl {
     if (kIsWeb) {
-      return 'http://$serverHost:5000';
+      // If deployed on Vercel or public domain, use the live Render backend
+      if (serverHost != 'localhost' && serverHost != '127.0.0.1') {
+        return _renderProductionUrl;
+      }
+      return _renderProductionUrl; // Connect directly to live Render backend
     } else if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:5000';
     } else {
-      return 'http://localhost:5000';
+      return _renderProductionUrl;
     }
   }
 

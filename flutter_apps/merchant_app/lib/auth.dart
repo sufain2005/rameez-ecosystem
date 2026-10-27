@@ -10,7 +10,7 @@ class MerchantAuth {
 
   static const String _prefTokenKey = 'rk_merchant_jwt_token';
   static const String _prefAdminKey = 'rk_merchant_admin_data';
-  static const String baseUrl = 'http://localhost:5000';
+  static const String baseUrl = 'https://rameez-kitchen-backend.onrender.com';
 
   static String? token;
   static Map<String, dynamic>? currentAdmin;

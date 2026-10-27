@@ -20,6 +20,7 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _hasSqlWarning = false;
+  bool _connectionError = false; // Set to true to show the warning banner
 
   @override
   void initState() {
@@ -190,8 +191,34 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
                           ),
                           const SizedBox(height: 20),
 
-                          // Security Alert Banner (if SQL warning or error)
-                          if (_hasSqlWarning)
+                          // Security Alert Banner (connection warning, SQL warning, or error)
+                          if (_connectionError)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 18),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade900.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.orangeAccent, width: 1),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 22),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Connecting to local server. For production deployment, ensure backend is running.',
+                                      style: TextStyle(
+                                        color: Colors.orangeAccent,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (_hasSqlWarning)
                             Container(
                               margin: const EdgeInsets.only(bottom: 18),
                               padding: const EdgeInsets.all(12),

@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _initSocket() {
     try {
-      _socket = IO.io('http://localhost:5000', IO.OptionBuilder()
+      _socket = IO.io('https://rameez-kitchen-backend.onrender.com', IO.OptionBuilder()
         .setTransports(['websocket', 'polling'])
         .disableAutoConnect()
         .build());
@@ -244,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Fetch driver customer reviews and tips
       try {
-        final res = await http.get(Uri.parse('http://localhost:5000/api/driver/ratings'));
+        final res = await http.get(Uri.parse('https://rameez-kitchen-backend.onrender.com/api/driver/ratings'));
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           if (data is Map && data['ratings'] is List) {

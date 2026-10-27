@@ -14,7 +14,7 @@ class ApiException implements Exception {
 class Api {
   // Chrome / Windows: localhost.  Android emulator: change to http://10.0.2.2:5000/api/driver
   // Real phone: use your PC's LAN IP, e.g. http://192.168.1.10:5000/api/driver
-  static const String base = 'http://localhost:5000/api/driver';
+  static const String base = 'https://rameez-kitchen-backend.onrender.com/api/driver';
 
   static String? token;
   static void Function()? onUnauthorized; // set in main.dart
@@ -37,7 +37,7 @@ class Api {
   static Map<String, String> _buildHeaders(String method, String path, [Map<String, dynamic>? body]) {
     final secHeaders = DriverSecurity.generateSecurityHeaders(
       method: method,
-      path: path,
+      path: Uri.parse('$base$path').path,
       body: body,
     );
     return {

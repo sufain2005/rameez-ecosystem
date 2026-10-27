@@ -40,7 +40,7 @@ class UniversalImagePicker {
             reader.onload = function(evt) {
               var base64Data = evt.target.result;
               if (input.parentNode) document.body.removeChild(input);
-              fetch('http://localhost:5000/api/upload', {
+              fetch('https://rameez-kitchen-backend.onrender.com/api/upload', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ image: base64Data, name: file.name })
