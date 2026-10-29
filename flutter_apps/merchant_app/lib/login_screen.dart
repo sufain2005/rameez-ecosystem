@@ -271,6 +271,52 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
                               ),
                             ),
 
+                          // Quick Demo Credentials Chip
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E232B),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF2E3846)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.key_rounded, color: Color(0xFFFF7A00), size: 20),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Default Executive Credentials', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                      SizedBox(height: 2),
+                                      Text('User: admin  •  Pass: admin', style: TextStyle(color: Color(0xFF8B949E), fontSize: 11)),
+                                    ],
+                                  ),
+                                ),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () {
+                                    setState(() {
+                                      _usernameController.text = 'admin';
+                                      _passwordController.text = 'admin';
+                                      _errorMessage = null;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF5200).withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFF5200)),
+                                    ),
+                                    child: const Text('AUTO FILL', style: TextStyle(color: Color(0xFFFF7A00), fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                           // Username / Email Field
                           const Text(
                             'ADMIN IDENTIFIER',

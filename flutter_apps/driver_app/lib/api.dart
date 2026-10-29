@@ -54,22 +54,22 @@ class Api {
     try {
       switch (method) {
         case 'POST':
-          r = await http.post(uri, headers: headers, body: jsonEncode(body ?? {}));
+          r = await http.post(uri, headers: headers, body: jsonEncode(body ?? {})).timeout(const Duration(seconds: 20));
           break;
         case 'PUT':
-          r = await http.put(uri, headers: headers, body: jsonEncode(body ?? {}));
+          r = await http.put(uri, headers: headers, body: jsonEncode(body ?? {})).timeout(const Duration(seconds: 20));
           break;
         case 'PATCH':
-          r = await http.patch(uri, headers: headers, body: jsonEncode(body ?? {}));
+          r = await http.patch(uri, headers: headers, body: jsonEncode(body ?? {})).timeout(const Duration(seconds: 20));
           break;
         case 'DELETE':
-          r = await http.delete(uri, headers: headers);
+          r = await http.delete(uri, headers: headers).timeout(const Duration(seconds: 20));
           break;
         default:
-          r = await http.get(uri, headers: headers);
+          r = await http.get(uri, headers: headers).timeout(const Duration(seconds: 20));
       }
     } catch (_) {
-      throw ApiException('Cannot reach server. Check your connection.', 0);
+      throw ApiException('Cannot reach server. If the server is spinning up on Render, please retry in a few seconds.', 0);
     }
 
     dynamic data;

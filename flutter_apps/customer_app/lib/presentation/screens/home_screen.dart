@@ -80,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String selectedPaymentMethod = 'UPI (GPay)';
   String? appliedCoupon;
   int discountAmount = 0;
+  int pendingCancellationFee = 0;
 
   List<dynamic> dynamicOffers = [];
   List<Map<String, dynamic>> activeOrdersList = [];
@@ -231,6 +232,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     setState(() {
       activeOrdersList.insert(0, payload);
       cartQuantities.clear();
+      pendingCancellationFee = 0;
+      appliedCoupon = null;
+      discountAmount = 0;
       _selectedTab = 1;
       widget.onTabChanged?.call(1);
     });
@@ -382,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               customerEmail = prof['email'];
             }
             if (prof['avatar'] != null && prof['avatar'].toString().isNotEmpty) {
-              customerAvatar = prof['avatar'];
+              customerAvatar = _sanitizeImageUrl(prof['avatar']?.toString(), isRestaurant: false);
             }
             if (prof['isGoldMember'] != null) {
               isGoldMember = prof['isGoldMember'] == true;
@@ -561,7 +565,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   int get serviceCharge => isGoldMember ? 0 : (((paymentSettings['serviceCharge'] as num?)?.toInt()) ?? 15);
 
-  int get finalPayableRupees => (subtotalRupees + calculatedTax + serviceCharge - discountAmount).clamp(0, 99999);
+  int get finalPayableRupees => (subtotalRupees + calculatedTax + serviceCharge + pendingCancellationFee - discountAmount).clamp(0, 99999);
 
   Future<void> _syncProfileWithServer() async {
     try {
@@ -593,47 +597,121 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _requestAndEnableLiveLocation({bool showNotification = false}) async {
     try {
+      if (showNotification && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                SizedBox(width: 12),
+                Text('Fetching your precise live location... 🛰️'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+            backgroundColor: Color(0xFFFF5200),
+          ),
+        );
+      }
+
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        debugPrint('[LOCATION] Location services disabled.');
+        if (showNotification && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enable GPS / Location services on your device to share address.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          debugPrint('[LOCATION] Permission denied');
+          if (showNotification && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission was denied. Please allow location access to auto-fill your address.'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        debugPrint('[LOCATION] Permission permanently denied');
+        if (showNotification && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permissions are permanently denied. Please allow in browser / app settings.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
         return;
       }
 
       final Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 6),
+          timeLimit: Duration(seconds: 10),
         ),
       );
 
       final lat = position.latitude;
       final lng = position.longitude;
 
-      String locText;
-      if ((lat >= 14.3 && lat <= 14.6) && (lng >= 75.8 && lng <= 76.1)) {
-        locText = "Live GPS: Near 60 Feet Ring Road, Davanagere";
-      } else {
-        locText = "Live GPS (${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)})";
+      String capturedHouse = 'Flat/Door';
+      String capturedStreet = 'Near GPS ($lat, $lng)';
+      String capturedArea = 'Davanagere';
+      String locText = 'Live GPS: $lat, $lng';
+
+      // Capture real address via OpenStreetMap Nominatim reverse geocoding
+      try {
+        final geoUrl = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1');
+        final res = await http.get(geoUrl, headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'RameezKitchenCustomerApp/1.0',
+        }).timeout(const Duration(seconds: 6));
+
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          if (data is Map && data['address'] is Map) {
+            final addr = data['address'] as Map;
+            final house = addr['house_number'] ?? addr['building'] ?? addr['commercial'] ?? 'Door No';
+            final street = addr['road'] ?? addr['residential'] ?? addr['neighbourhood'] ?? addr['suburb'] ?? 'Main Road';
+            final area = addr['suburb'] ?? addr['city'] ?? addr['town'] ?? addr['village'] ?? addr['county'] ?? 'Davanagere';
+            final postcode = addr['postcode'] != null ? ' - ${addr['postcode']}' : '';
+
+            capturedHouse = house.toString();
+            capturedStreet = street.toString();
+            capturedArea = '$area$postcode';
+            locText = '$capturedHouse, $capturedStreet, $capturedArea';
+          }
+        }
+      } catch (geoErr) {
+        debugPrint('[GEOCODE ERROR] $geoErr');
+        if ((lat >= 14.3 && lat <= 14.6) && (lng >= 75.8 && lng <= 76.1)) {
+          capturedHouse = '104P/P-78';
+          capturedStreet = '60 Feet Ring Road';
+          capturedArea = 'Davanagere';
+          locText = 'Near 60 Feet Ring Road, Davanagere';
+        } else {
+          capturedHouse = 'My Location';
+          capturedStreet = 'Lat: ${lat.toStringAsFixed(4)}';
+          capturedArea = 'Lng: ${lng.toStringAsFixed(4)}';
+          locText = 'GPS (${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)})';
+        }
       }
 
       if (mounted) {
         setState(() {
-          houseNo = "Current Location";
-          streetName = "GPS: ${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}";
-          areaName = locText;
+          houseNo = capturedHouse;
+          streetName = capturedStreet;
+          areaName = capturedArea;
           deliveryAddress = locText;
         });
 
@@ -647,14 +725,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   const Icon(Icons.location_on_rounded, color: Colors.white, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text('Live location enabled: $locText 📍',
+                    child: Text('Live address captured: $locText 📍',
                         style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
                   ),
                 ],
               ),
               backgroundColor: const Color(0xFF0F8A65),
               behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 3),
+              duration: const Duration(seconds: 4),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           );
@@ -662,6 +740,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     } catch (e) {
       debugPrint('[LOCATION] Error enabling live location: $e');
+      if (showNotification && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not fetch location: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -857,7 +943,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
                             icon: const Icon(Icons.check_circle_outline, color: Colors.white),
-                            label: const Text('SAVE & UPDATE DB', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5)),
+                            label: const Text('SAVE CHANGES', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5)),
                             onPressed: () {
                               if (!formKey.currentState!.validate()) return;
                               HapticFeedback.lightImpact();
@@ -872,7 +958,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Address successfully saved to database! 💾'), backgroundColor: Colors.green),
+                                const SnackBar(content: Text('Address successfully saved! 📍'), backgroundColor: Colors.green),
                               );
                             },
                           ),
@@ -906,108 +992,162 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (dialogCtx, setDialogState) => Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDarkMode ? const Color(0xFF1E1E22) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Row(
-                children: [
-                  Icon(Icons.local_offer_rounded, color: Color(0xFFFF5200), size: 22),
-                  SizedBox(width: 8),
-                  Text('Available Offers & Coupons', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-                ],
-              ),
-              const SizedBox(height: 14),
-              ...offersList.map((o) {
-                final code = o['code']?.toString() ?? 'OFFER';
-                final disc = (o['discount'] as num?)?.toInt() ?? 20;
-                final desc = o['description']?.toString() ?? 'Special discount';
-                final isThisApplied = appliedCoupon == code;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? const Color(0xFF2A2A2E) : const Color(0xFFF9FAFB),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isThisApplied ? Colors.green : (isDarkMode ? Colors.white12 : Colors.grey.shade200),
-                      width: isThisApplied ? 1.5 : 1,
-                    ),
+        builder: (dialogCtx, setDialogState) => Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: 580,
+              maxHeight: MediaQuery.of(effectiveContext).size.height * 0.85,
+            ),
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1E1E22) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 20, offset: const Offset(0, -4)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF5200).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFFFF5200), size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                ),
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    Icon(Icons.local_offer_rounded, color: Color(0xFFFF5200), size: 22),
+                    SizedBox(width: 8),
+                    Text('Available Offers & Coupons', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: offersList.map((o) {
+                        final code = o['code']?.toString() ?? 'OFFER';
+                        final disc = (o['discount'] as num?)?.toInt() ?? 20;
+                        final desc = o['description']?.toString() ?? 'Special discount';
+                        final isThisApplied = appliedCoupon == code;
+
+                        return InkWell(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            if (isThisApplied) {
+                              onApply('', 0);
+                            } else {
+                              onApply(code, disc);
+                            }
+                            Navigator.of(dialogCtx).pop();
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isDarkMode ? const Color(0xFF2A2A2E) : const Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isThisApplied ? Colors.green : (isDarkMode ? Colors.white12 : Colors.grey.shade300),
+                                width: isThisApplied ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Text(code, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5)),
-                                const SizedBox(width: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
+                                    color: const Color(0xFFFF5200).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Text('SAVE ₹$disc', style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w900)),
+                                  child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFFFF5200), size: 24),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Wrap(
+                                        spacing: 8,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          Text(
+                                            code,
+                                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.8),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              'SAVE ₹$disc',
+                                              style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w900),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        desc,
+                                        softWrap: true,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+                                          fontSize: 12,
+                                          height: 1.25,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  height: 38,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isThisApplied ? Colors.green : const Color(0xFFFF5200),
+                                      foregroundColor: Colors.white,
+                                      elevation: isThisApplied ? 0 : 2,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                                    ),
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      if (isThisApplied) {
+                                        onApply('', 0);
+                                      } else {
+                                        onApply(code, disc);
+                                      }
+                                      Navigator.of(dialogCtx).pop();
+                                    },
+                                    child: Text(
+                                      isThisApplied ? 'APPLIED' : 'APPLY',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
-                            Text(desc, style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isThisApplied ? Colors.green : const Color(0xFFFF5200),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        ),
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          if (isThisApplied) {
-                            onApply('', 0);
-                          } else {
-                            onApply(code, disc);
-                          }
-                          Navigator.of(dialogCtx).pop();
-                        },
-                        child: Text(
-                          isThisApplied ? 'APPLIED' : 'APPLY',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
-                        ),
-                      ),
-                    ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
-                );
-              }),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1192,6 +1332,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             children: [
                               const Text('Coupon Discount', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 13)),
                               Text('-₹$discountAmount', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 13)),
+                            ],
+                          ),
+                        ],
+                        if (pendingCancellationFee > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.receipt_long_outlined, color: Colors.deepOrange, size: 14),
+                                  SizedBox(width: 4),
+                                  Text('Previous Cancellation Charge', style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w700, fontSize: 13)),
+                                ],
+                              ),
+                              Text('₹$pendingCancellationFee', style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w900, fontSize: 13)),
                             ],
                           ),
                         ],
@@ -2129,7 +2285,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
               child: Image.network(
-                item['image'] ?? '',
+                _sanitizeImageUrl(item['image']?.toString(), isRestaurant: false),
                 width: 80, height: 80, fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
                   width: 80, height: 80,
@@ -2279,10 +2435,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _featuredFoodCard(Map<String, dynamic> item) {
     final id = item['id'];
     final quantity = id is int ? (cartQuantities[id] ?? 0) : 0;
-    final rawImage = item['image']?.toString() ?? '';
+    final rawImage = _sanitizeImageUrl(item['image']?.toString(), isRestaurant: false);
     final imageUri = Uri.tryParse(rawImage);
     final safeImage = imageUri != null &&
-        imageUri.scheme == 'https' && imageUri.host.isNotEmpty && imageUri.userInfo.isEmpty;
+        (imageUri.scheme == 'https' || imageUri.scheme == 'http') && imageUri.host.isNotEmpty && imageUri.userInfo.isEmpty;
     final canOrder = globalStatus['state'] != 'PAUSED' && id is int;
 
     return Container(
@@ -3424,7 +3580,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  String _sanitizeImageUrl(String? rawUrl, {bool isRestaurant = true}) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) {
+      return isRestaurant
+          ? 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'
+          : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400';
+    }
+    String url = rawUrl.trim();
+    if (url.startsWith('/')) {
+      url = 'https://rameez-kitchen-backend.onrender.com$url';
+    } else {
+      url = url.replaceAll(RegExp(r'https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?'), 'https://rameez-kitchen-backend.onrender.com');
+      if (url.startsWith('http://rameez-kitchen-backend.onrender.com')) {
+        url = url.replaceFirst('http://', 'https://');
+      }
+    }
+    return url;
+  }
+
   Widget _branchTile(String name, String hours, String rating, String img) {
+    final safeImg = _sanitizeImageUrl(img, isRestaurant: true);
+    final fallbackImg = name.toLowerCase().contains('express') || name.toLowerCase().contains('nittuvalli')
+        ? 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600'
+        : 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600';
     return Container(
       decoration: BoxDecoration(
         color: isDarkMode ? const Color(0xFF2A2A2E) : Colors.white,
@@ -3435,8 +3613,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            child: Image.network(img, height: 75, width: double.infinity, fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(height: 75, color: Colors.grey.shade200)),
+            child: Image.network(
+              safeImg,
+              height: 80,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Image.network(
+                fallbackImg,
+                height: 80,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(8),
@@ -3953,6 +4141,344 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     ).whenComplete(() {
       _isRatingModalOpen = false;
     });
+  }
+
+  bool _isLegitimateCancellationReason(String reason, String orderStatus, DateTime? orderCreatedAt) {
+    final lower = reason.toLowerCase().trim();
+    if (lower.isEmpty) return false;
+
+    // 1. Legitimate reasons: delays, errors, duplicate orders, kitchen requests
+    final legitKeywords = [
+      'delay',
+      'late',
+      'taking too long',
+      'excessive',
+      'wrong address',
+      'incorrect address',
+      'mistake',
+      'accident',
+      'duplicate',
+      'restaurant requested',
+      'kitchen asked',
+      'emergency',
+      'unresponsive',
+      'rider not moving',
+      'stuck',
+      'illness',
+      'closed',
+    ];
+    if (legitKeywords.any((kw) => lower.contains(kw))) {
+      return true;
+    }
+
+    // 2. Early cancellation within 2 minutes of placement is always legitimate
+    if (orderCreatedAt != null) {
+      final diff = DateTime.now().difference(orderCreatedAt).inMinutes;
+      if (diff <= 2) return true;
+    }
+
+    // 3. If order status is still PLACED (not yet started cooking), cancellation is legitimate
+    if (orderStatus == 'PLACED') return true;
+
+    return false;
+  }
+
+  void _showCancelOrderDialog(String orderId, Map<String, dynamic> order) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final orderStatus = (order['status']?.toString() ?? 'PLACED').toUpperCase();
+    
+    DateTime? orderCreatedAt;
+    if (order['createdAt'] != null) {
+      try {
+        orderCreatedAt = DateTime.parse(order['createdAt'].toString()).toLocal();
+      } catch (_) {}
+    }
+
+    String selectedReason = 'Order is taking much longer than estimated (Preparation Delay)';
+    final customReasonCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    final reasons = [
+      'Order is taking much longer than estimated (Preparation Delay)',
+      'Entered incorrect delivery address by mistake',
+      'Placed duplicate order accidentally',
+      'Rameez Kitchen requested to cancel order',
+      'Change of mind / No longer needed',
+      'Other reason (type custom explanation below)',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final effectiveReason = selectedReason.startsWith('Other') && customReasonCtrl.text.trim().isNotEmpty
+              ? customReasonCtrl.text.trim()
+              : selectedReason;
+
+          final bool isLegit = _isLegitimateCancellationReason(effectiveReason, orderStatus, orderCreatedAt);
+          final int cancellationFee = isLegit ? 0 : 50;
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 580),
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? const Color(0xFF1E1E22) : Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 20, offset: const Offset(0, -4)),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.12), shape: BoxShape.circle),
+                            child: const Icon(Icons.cancel_rounded, color: Colors.red, size: 22),
+                          ),
+                          const SizedBox(width: 10),
+                          Text('Cancel Order #$orderId', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Terms Card
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? const Color(0xFF2A2A2E) : const Color(0xFFFFF7F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFF5200).withValues(alpha: 0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.policy_outlined, size: 16, color: Color(0xFFFF5200)),
+                                SizedBox(width: 6),
+                                Text('Cancellation Policy & Terms', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFFFF5200))),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '• If you cancel due to preparation delay or genuine error, charges are 100% WAIVED (₹0 Fee).\n• For late cancellations after cooking has begun, a ₹50 fee will be included on your next order.',
+                              style: TextStyle(fontSize: 11, color: isDarkMode ? Colors.white70 : Colors.black87, height: 1.35),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      const Text('Why are you cancelling?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      const SizedBox(height: 8),
+
+                      ...reasons.map((r) {
+                        final isSel = selectedReason == r;
+                        return InkWell(
+                          onTap: () {
+                            setModalState(() => selectedReason = r);
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isSel ? const Color(0xFFFF5200).withValues(alpha: 0.08) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isSel ? const Color(0xFFFF5200) : Colors.grey.shade300),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSel ? Icons.radio_button_checked : Icons.radio_button_off,
+                                  color: isSel ? const Color(0xFFFF5200) : Colors.grey,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    r,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                                      color: isSel ? const Color(0xFFFF5200) : (isDarkMode ? Colors.white : Colors.black87),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+
+                      if (selectedReason.startsWith('Other')) ...[
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: customReasonCtrl,
+                          onChanged: (_) => setModalState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Please describe the reason for cancellation...',
+                            hintStyle: const TextStyle(fontSize: 12),
+                            filled: true,
+                            fillColor: isDarkMode ? const Color(0xFF2A2A2E) : Colors.grey.shade100,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+
+                      const SizedBox(height: 14),
+
+                      // Fee Calculation Result Banner
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isLegit ? Colors.green.withValues(alpha: 0.1) : Colors.amber.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isLegit ? Colors.green.shade300 : Colors.amber.shade600),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(isLegit ? Icons.verified_user_rounded : Icons.info_rounded, color: isLegit ? Colors.green : Colors.amber.shade800, size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isLegit ? 'Valid Reason Verified: ₹0 Fee (Waived!)' : 'Cancellation Fee: ₹50 on Next Order',
+                                    style: TextStyle(
+                                      color: isLegit ? Colors.green.shade800 : Colors.amber.shade900,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isLegit
+                                        ? 'No cancellation charge will be billed. Order will be cancelled free of charge.'
+                                        : 'Standard ₹50 fee will be automatically included in your next food order checkout.',
+                                    style: TextStyle(
+                                      color: isLegit ? Colors.green.shade900 : Colors.amber.shade900,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // Actions
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => Navigator.pop(dialogCtx),
+                              child: const Text('KEEP ORDER', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isLegit ? Colors.green.shade700 : Colors.red.shade700,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () async {
+                                      setModalState(() => isSubmitting = true);
+                                      try {
+                                        final cancelUrl = Uri.parse('${ApiConstants.baseUrl}/orders/$orderId/cancel');
+                                        await http.post(
+                                          cancelUrl,
+                                          headers: {'Content-Type': 'application/json'},
+                                          body: jsonEncode({
+                                            'fee': cancellationFee,
+                                            'reason': effectiveReason,
+                                            'phone': customerPhone,
+                                            'chargeNextOrder': cancellationFee > 0,
+                                          }),
+                                        ).timeout(const Duration(seconds: 6));
+                                      } catch (err) {
+                                        debugPrint('[CANCEL ORDER ERROR] $err');
+                                      }
+
+                                      if (mounted) {
+                                        setState(() {
+                                          order['status'] = 'CANCELLED';
+                                          order['cancellationFee'] = cancellationFee;
+                                          order['cancellationReason'] = effectiveReason;
+                                          if (cancellationFee > 0) {
+                                            pendingCancellationFee = cancellationFee;
+                                          }
+                                        });
+
+                                        Navigator.pop(dialogCtx);
+
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              cancellationFee > 0
+                                                  ? 'Order cancelled. ₹$cancellationFee will be included on your next order.'
+                                                  : 'Order cancelled with ₹0 charges (Fee Waived).',
+                                            ),
+                                            backgroundColor: cancellationFee > 0 ? Colors.deepOrange : Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    },
+                              child: isSubmitting
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : Text(
+                                      isLegit ? 'CONFIRM CANCEL (FREE)' : 'CANCEL (₹50 ON NEXT ORDER)',
+                                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   // 3. FULL LIVE ORDERS TRACKER & DASHBOARD
@@ -4562,6 +5088,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           icon: const Icon(Icons.star, color: Colors.white),
                           label: const Text('RATE YOUR FOOD & DELIVERY HERO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
                           onPressed: () => _showDriverRatingModal(orderId, driverName, driverCode),
+                        ),
+                      ),
+                    ],
+
+                    // ── 8. CANCEL ORDER BUTTON & STATUS BANNER ──
+                    if (status != 'DELIVERED' && status != 'CANCELLED') ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade700,
+                            side: BorderSide(color: Colors.red.shade300, width: 1.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
+                          label: const Text('CANCEL ORDER', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+                          onPressed: () => _showCancelOrderDialog(orderId, order),
+                        ),
+                      ),
+                    ] else if (status == 'CANCELLED') ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.cancel_rounded, color: Colors.red, size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Order Cancelled', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900, fontSize: 13)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    order['cancellationReason'] != null
+                                        ? '${order['cancellationReason']}'
+                                        : 'Cancelled by customer',
+                                    style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 11),
+                                  ),
+                                  if (order['cancellationFee'] != null && (order['cancellationFee'] as num) > 0)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        'Policy charge: ₹${order['cancellationFee']} (included on next order)',
+                                        style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 11),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -5270,7 +5854,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   children: [
                     CircleAvatar(
                       radius: 36,
-                      backgroundImage: NetworkImage(customerAvatar),
+                      backgroundImage: NetworkImage(_sanitizeImageUrl(customerAvatar, isRestaurant: false)),
                       onBackgroundImageError: (_, _) => const Icon(Icons.person, size: 36),
                     ),
                     Positioned(
