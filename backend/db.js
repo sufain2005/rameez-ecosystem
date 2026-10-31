@@ -149,6 +149,12 @@ async function initSchema() {
         revoked BOOLEAN NOT NULL DEFAULT FALSE
       );
 
+      CREATE TABLE IF NOT EXISTS store_settings (
+        key VARCHAR(80) PRIMARY KEY,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       ALTER TABLE driver_deliveries ADD COLUMN IF NOT EXISTS pickup_lat DOUBLE PRECISION DEFAULT 14.4644;
       ALTER TABLE driver_deliveries ADD COLUMN IF NOT EXISTS pickup_lng DOUBLE PRECISION DEFAULT 75.9218;
       ALTER TABLE driver_deliveries ADD COLUMN IF NOT EXISTS delivery_lat DOUBLE PRECISION DEFAULT 14.4690;

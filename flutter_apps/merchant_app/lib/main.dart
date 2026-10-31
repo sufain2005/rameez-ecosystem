@@ -3804,6 +3804,13 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
     'ownerName': 'Rameez Ahmed',
     'avatar': 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=400',
     'banner': 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200',
+    'banners': [
+      'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800',
+      'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=800',
+      'https://images.unsplash.com/photo-1544025162-d76694265947?w=800',
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800',
+    ],
+    'maxCustomerLimit': 500,
     'rating': 4.9,
     'cuisine': 'Mughlai • North Indian • Biryani • BBQ',
     'operatingHours': '11:00 AM – 11:30 PM',
@@ -4108,6 +4115,8 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
       'tagline': _taglineCtrl.text.trim(),
       'avatar': restaurantProfile['avatar'],
       'banner': restaurantProfile['banner'],
+      'banners': restaurantProfile['banners'],
+      'maxCustomerLimit': restaurantProfile['maxCustomerLimit'] ?? 500,
       'currentPassword': _oldPassCtrl.text.trim(),
       'newPassword': _newPassCtrl.text.trim(),
     };
@@ -4276,6 +4285,230 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
     );
   }
 
+  // ── MOVING HERO BANNERS & 500 CUSTOMERS LIMIT MANAGER ──
+  Widget _buildMovingHeroBannersManager() {
+    final List<String> banners = (restaurantProfile['banners'] is List)
+        ? List<String>.from(restaurantProfile['banners'])
+        : [
+            'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800',
+            'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=800',
+            'https://images.unsplash.com/photo-1544025162-d76694265947?w=800',
+            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800',
+          ];
+    final int customerLimit = restaurantProfile['maxCustomerLimit'] ?? 500;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.collections_rounded, color: Color(0xFFFF5200), size: 22),
+                    SizedBox(width: 8),
+                    Text(
+                      'Moving Hero Banners (Real Pictures)',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF1E1E22)),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${banners.length} Live Slides',
+                    style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'These real merchant photos rotate dynamically in an auto-sliding hero carousel for all customers.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 14),
+
+            // Customer Limit Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF5200).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFF5200).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.people_alt_rounded, color: Color(0xFFFF5200), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Max Customer Capacity: $customerLimit Customers',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFFFF5200)),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Guaranteed high-speed kitchen and delivery service limited to top 500 customers.',
+                          style: TextStyle(fontSize: 11, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF5200),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('ACTIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Horizontal Preview of moving photos
+            SizedBox(
+              height: 120,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: banners.length + 1,
+                itemBuilder: (ctx, i) {
+                  if (i == banners.length) {
+                    // Add Picture Button
+                    return InkWell(
+                      onTap: () {
+                        UniversalImagePicker.pickImage(
+                          onSelected: (url, _) {
+                            setState(() {
+                              banners.add(url);
+                              restaurantProfile['banners'] = banners;
+                            });
+                            _saveAdminProfile();
+                          },
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 100,
+                        margin: const EdgeInsets.only(right: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate_rounded, color: Color(0xFFFF5200), size: 28),
+                            SizedBox(height: 6),
+                            Text('Add Photo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF5200))),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  final url = banners[i];
+                  return Container(
+                    width: 130,
+                    margin: const EdgeInsets.only(right: 10),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            url,
+                            width: 130,
+                            height: 120,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey.shade200,
+                              child: const Icon(Icons.broken_image, color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: InkWell(
+                            onTap: () {
+                              if (banners.length <= 1) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('At least 1 banner photo is required.')),
+                                );
+                                return;
+                              }
+                              setState(() {
+                                banners.removeAt(i);
+                                restaurantProfile['banners'] = banners;
+                              });
+                              _saveAdminProfile();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.black75,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 16),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 4,
+                          left: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
+                            child: Text('Slide ${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Save and Broadcast Button
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF5200),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.sync_rounded, size: 18),
+                label: const Text('SAVE & BROADCAST TO CUSTOMERS NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                onPressed: () {
+                  restaurantProfile['banners'] = banners;
+                  restaurantProfile['maxCustomerLimit'] = customerLimit;
+                  _saveAdminProfile();
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator(color: Color(0xFFFF5200)));
@@ -4290,6 +4523,10 @@ class _CombinedAdminSettingsViewState extends State<CombinedAdminSettingsView> {
       children: [
         // ── 1. RESTAURANT & MERCHANT BRANDING HEADER CARD ──
         _buildMerchantBrandingCard(),
+        const SizedBox(height: 16),
+
+        // ── 1.5. MOVING HERO BANNERS & 500 CUSTOMERS LIMIT MANAGER ──
+        _buildMovingHeroBannersManager(),
         const SizedBox(height: 16),
 
         // ── 2. DUAL-BRANCH OPERATIONS CONTROL CARDS (WITH DIRECT PHOTO UPLOAD) ──

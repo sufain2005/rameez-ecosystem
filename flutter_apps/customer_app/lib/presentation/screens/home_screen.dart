@@ -84,6 +84,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int discountAmount = 0;
   int pendingCancellationFee = 0;
 
+  // Real Moving Hero Pictures from Merchant & 500 Customers Limit
+  List<String> heroBanners = [
+    'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800',
+    'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=800',
+    'https://images.unsplash.com/photo-1544025162-d76694265947?w=800',
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800',
+  ];
+  late final PageController _heroBannerPageCtrl = PageController();
+  int _currentHeroBannerIndex = 0;
+  Timer? _heroBannerTimer;
+  int maxCustomerCapacity = 500;
+
   List<dynamic> dynamicOffers = [];
   List<Map<String, dynamic>> activeOrdersList = [];
   List<Map<String, dynamic>> pastOrdersList = [
@@ -289,6 +301,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     initSocketConnection();
     _requestAndEnableLiveLocation(showNotification: false);
 
+    _heroBannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (_heroBannerPageCtrl.hasClients && heroBanners.length > 1) {
+        int next = (_heroBannerPageCtrl.page?.toInt() ?? 0) + 1;
+        if (next >= heroBanners.length) {
+          next = 0;
+          _heroBannerPageCtrl.animateToPage(0, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
+        } else {
+          _heroBannerPageCtrl.animateToPage(next, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
+        }
+      }
+    });
+
     _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (_midBannerCtrl.hasClients && dynamicOffers.isNotEmpty) {
         int nextPage = (_midBannerCtrl.page?.toInt() ?? 0) + 1;
@@ -373,6 +397,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             if (data['branchStatus'] != null) branchStatus = Map<String, dynamic>.from(data['branchStatus']);
             if (data['branchesInfo'] != null) branchesInfo = Map<String, dynamic>.from(data['branchesInfo']);
             if (data['globalStatus'] != null) globalStatus = Map<String, dynamic>.from(data['globalStatus']);
+            if (data['restaurantProfile'] != null && data['restaurantProfile']['banners'] is List) {
+              final bList = data['restaurantProfile']['banners'] as List;
+              if (bList.isNotEmpty) {
+                heroBanners = bList.map((e) => _sanitizeImageUrl(e.toString(), isRestaurant: true)).toList();
+              }
+            }
+            if (data['restaurantProfile'] != null && data['restaurantProfile']['maxCustomerLimit'] != null) {
+              maxCustomerCapacity = (data['restaurantProfile']['maxCustomerLimit'] as num).toInt();
+            }
           }
           if (resOffer.statusCode == 200) dynamicOffers = jsonDecode(resOffer.body);
           if (resOrders.statusCode == 200) {
@@ -468,6 +501,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     socket.on('settings:updated', (data) {
       if (mounted) setState(() => paymentSettings = Map<String, dynamic>.from(data));
+    });
+
+    socket.on('restaurant:banners_updated', (data) {
+      if (mounted && data is List) {
+        setState(() {
+          heroBanners = data.map((e) => _sanitizeImageUrl(e.toString(), isRestaurant: true)).toList();
+        });
+      }
+    });
+
+    socket.on('restaurant:profile_updated', (data) {
+      if (mounted && data is Map) {
+        setState(() {
+          if (data['banners'] != null && data['banners'] is List) {
+            final bList = data['banners'] as List;
+            if (bList.isNotEmpty) {
+              heroBanners = bList.map((e) => _sanitizeImageUrl(e.toString(), isRestaurant: true)).toList();
+            }
+          }
+          if (data['maxCustomerLimit'] != null) {
+            maxCustomerCapacity = (data['maxCustomerLimit'] as num).toInt();
+          }
+        });
+      }
     });
 
     socket.on('order:status_update', (data) {
@@ -1053,17 +1110,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             width: double.infinity,
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
-                              color: isDarkMode ? const Color(0xFF2A2A2E) : const Color(0xFFF9FAFB),
+                              color: isDarkMode ? const Color(0xFF2A2A2E) : Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: isThisApplied ? const Color(0xFFFF5200) : (isDarkMode ? Colors.white12 : Colors.grey.shade300),
                                 width: isThisApplied ? 2 : 1,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDarkMode ? 0.2 : 0.04),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            child: Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
-                              child: InkWell(
+                            child: Theme(
+                              data: (isDarkMode ? ThemeData.dark() : ThemeData.light()).copyWith(
+                                splashColor: const Color(0xFFFF5200).withValues(alpha: 0.1),
+                                highlightColor: Colors.transparent,
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                 onTap: () {
                                   HapticFeedback.lightImpact();
                                   if (isThisApplied) {
@@ -1073,93 +1141,77 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   }
                                   Navigator.of(dialogCtx).pop();
                                 },
-                                borderRadius: BorderRadius.circular(16),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 44,
-                                        height: 44,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFF5200).withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFFFF5200), size: 24),
+                                leading: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFF5200).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(Icons.local_offer_rounded, color: Color(0xFFFF5200), size: 22),
+                                ),
+                                title: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      code,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 16,
+                                        color: isDarkMode ? Colors.white : const Color(0xFF1E1E22),
+                                        letterSpacing: 0.8,
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Flexible(
-                                                  child: Text(
-                                                    code,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.8),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.green.withValues(alpha: 0.15),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Text(
-                                                    'SAVE ₹$disc',
-                                                    style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w900),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              desc,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
-                                                fontSize: 12,
-                                                height: 1.25,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
                                       ),
-                                      const SizedBox(width: 10),
-                                      SizedBox(
-                                        height: 36,
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: isThisApplied ? Colors.green : const Color(0xFFFF5200),
-                                            foregroundColor: Colors.white,
-                                            elevation: 0,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                                          ),
-                                          onPressed: () {
-                                            HapticFeedback.lightImpact();
-                                            if (isThisApplied) {
-                                              onApply('', 0);
-                                            } else {
-                                              onApply(code, disc);
-                                            }
-                                            Navigator.of(dialogCtx).pop();
-                                          },
-                                          child: Text(
-                                            isThisApplied ? 'APPLIED' : 'APPLY',
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
-                                          ),
-                                        ),
+                                      child: Text(
+                                        'SAVE ₹$disc',
+                                        style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w900),
                                       ),
-                                    ],
+                                    ),
+                                  ],
+                                ),
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    desc,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDarkMode ? Colors.grey.shade400 : Colors.black87,
+                                      height: 1.25,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                trailing: SizedBox(
+                                  width: 86,
+                                  height: 36,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isThisApplied ? Colors.green : const Color(0xFFFF5200),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      if (isThisApplied) {
+                                        onApply('', 0);
+                                      } else {
+                                        onApply(code, disc);
+                                      }
+                                      Navigator.of(dialogCtx).pop();
+                                    },
+                                    child: Text(
+                                      isThisApplied ? 'APPLIED' : 'APPLY',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2611,35 +2663,84 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── Hero Restaurant Banner ────────────────────────────────────────────────────
+  // ── Hero Restaurant Banner (Moving Real Pictures from Merchant) ────────────
   Widget _buildHeroBanner() {
     final isOpen = globalStatus['state'] != 'PAUSED';
+    final effectiveBanners = heroBanners.isNotEmpty
+        ? heroBanners
+        : ['https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800'];
+
     return Stack(
       children: [
+        // 1. Moving Real Pictures Slider
         SizedBox(
-          height: 220,
+          height: 235,
           width: double.infinity,
-          child: Image.network(
-            'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800',
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              height: 220,
-              color: const Color(0xFF1A1A1A),
-              child: const Center(child: Icon(Icons.restaurant, color: Colors.white38, size: 60)),
-            ),
+          child: PageView.builder(
+            controller: _heroBannerPageCtrl,
+            onPageChanged: (idx) {
+              setState(() => _currentHeroBannerIndex = idx);
+            },
+            itemCount: effectiveBanners.length,
+            itemBuilder: (ctx, index) {
+              final imgUrl = _sanitizeImageUrl(effectiveBanners[index], isRestaurant: true);
+              return Image.network(
+                imgUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Image.network(
+                  'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800',
+                  fit: BoxFit.cover,
+                ),
+              );
+            },
           ),
         ),
+
+        // 2. High-contrast gradient overlay
         Container(
-          height: 220,
+          height: 235,
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.transparent, Color(0xCC000000)],
+              colors: [Colors.black38, Color(0xDD000000)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              stops: [0.3, 1.0],
+              stops: [0.25, 1.0],
             ),
           ),
         ),
+
+        // 3. Top Slide Indicator Dots
+        if (effectiveBanners.length > 1)
+          Positioned(
+            top: 14,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24, width: 0.8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(effectiveBanners.length, (i) {
+                  final isCurrent = i == _currentHeroBannerIndex;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                    width: isCurrent ? 14 : 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: isCurrent ? const Color(0xFFFF5200) : Colors.white54,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+
+        // 4. Restaurant Brand Details & 500 Customer Limit Badge
         Positioned(
           bottom: 0,
           left: 0,
@@ -2671,6 +2772,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       child: const Text('⚡ FASTEST', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
                     ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF5200),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '🔥 LIMIT $maxCustomerCapacity CUSTOMERS',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -2691,6 +2804,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _infoPill(Icons.timer_outlined, '25–35 min', Colors.white),
                     const SizedBox(width: 8),
                     _infoPill(Icons.delivery_dining_outlined, isGoldMember ? 'Free for Gold' : 'Fast Delivery', const Color(0xFFFF5200)),
+                    const SizedBox(width: 8),
+                    _infoPill(Icons.people_alt_outlined, 'Cap: $maxCustomerCapacity', Colors.white70),
                   ],
                 ),
               ],
@@ -6068,6 +6183,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _heroBannerTimer?.cancel();
+    _heroBannerPageCtrl.dispose();
     _minuteTimer?.cancel();
     _bannerTimer?.cancel();
     _flashTimer?.cancel();

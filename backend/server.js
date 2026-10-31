@@ -306,11 +306,57 @@ let restaurantProfile = {
   ownerName: 'Rameez Ahmed',
   avatar: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=400',
   banner: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200',
+  banners: [
+    'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800',
+    'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=800',
+    'https://images.unsplash.com/photo-1544025162-d76694265947?w=800',
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800',
+  ],
+  maxCustomerLimit: 500,
   rating: 4.9,
   cuisine: 'Mughlai • North Indian • Biryani • BBQ',
   operatingHours: '11:00 AM – 11:30 PM',
   fssaiNumber: '11223344005566',
 };
+
+async function loadStoreSettingsFromDb() {
+  try {
+    const pool = require('./driver/db');
+    const res = await pool.query("SELECT value FROM store_settings WHERE key = 'restaurant_profile'");
+    if (res.rows.length > 0 && res.rows[0].value) {
+      restaurantProfile = { ...restaurantProfile, ...res.rows[0].value };
+      if (!Array.isArray(restaurantProfile.banners) || restaurantProfile.banners.length === 0) {
+        restaurantProfile.banners = [
+          'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800',
+          'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=800',
+          'https://images.unsplash.com/photo-1544025162-d76694265947?w=800',
+          'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800',
+        ];
+      }
+      restaurantProfile.maxCustomerLimit = Number(restaurantProfile.maxCustomerLimit) || 500;
+      console.log('✓ Restaurant profile & real moving banners loaded from PostgreSQL database');
+    }
+  } catch (err) {
+    console.log('[STORE SETTINGS] Using memory profile defaults:', err.message);
+  }
+}
+
+async function saveStoreSettingsToDb() {
+  try {
+    const pool = require('./driver/db');
+    await pool.query(
+      `INSERT INTO store_settings (key, value, updated_at)
+       VALUES ('restaurant_profile', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
+      [JSON.stringify(restaurantProfile)]
+    );
+    console.log('✓ Persisted restaurant profile, moving banners, and 500 customer limit to PostgreSQL');
+  } catch (err) {
+    console.error('[STORE SETTINGS] Failed to persist to PostgreSQL:', err.message);
+  }
+}
+
+loadStoreSettingsFromDb();
 
 let globalStatus = {
   state: 'ACCEPTING_ORDERS',
@@ -1613,6 +1659,23 @@ app.post(['/admin/profile', '/api/admin/profile'], (req, res) => {
     changes.push(`Hours updated to '${sanitizeText(operatingHours)}'`);
     restaurantProfile.operatingHours = sanitizeText(operatingHours);
   }
+  if (Array.isArray(req.body.banners)) {
+    changes.push('Moving hero banners updated');
+    restaurantProfile.banners = req.body.banners
+      .map((b) => {
+        let url = String(b).trim();
+        if (url.includes('localhost') || url.includes('127.0.0.1')) {
+          url = url.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, 'https://rameez-kitchen-backend.onrender.com');
+        }
+        return url;
+      })
+      .filter(Boolean);
+  }
+  if (req.body.maxCustomerLimit) {
+    const limit = Number(req.body.maxCustomerLimit) || 500;
+    changes.push(`Max customer limit set to ${limit}`);
+    restaurantProfile.maxCustomerLimit = limit;
+  }
 
   let pwdChanged = false;
   if (newPassword && isValidPassword(newPassword)) {
@@ -1643,8 +1706,47 @@ app.post(['/admin/profile', '/api/admin/profile'], (req, res) => {
     });
   }
 
+  await saveStoreSettingsToDb();
+  io.emit('restaurant:banners_updated', restaurantProfile.banners);
   io.emit('restaurant:profile_updated', restaurantProfile);
   return res.json({ success: true, admin: safeAdminProfile(), restaurantProfile });
+});
+
+// ---------- RESTAURANT BANNERS & PROFILE API ----------
+app.get(['/restaurant/banners', '/api/restaurant/banners'], (req, res) => {
+  return res.json({
+    success: true,
+    banners: restaurantProfile.banners || [],
+    maxCustomerLimit: restaurantProfile.maxCustomerLimit || 500,
+    restaurantProfile,
+  });
+});
+
+app.post(['/merchant/banners', '/api/merchant/banners'], async (req, res) => {
+  const { banners, maxCustomerLimit } = req.body;
+  if (Array.isArray(banners)) {
+    restaurantProfile.banners = banners
+      .map((b) => {
+        let url = String(b).trim();
+        if (url.includes('localhost') || url.includes('127.0.0.1')) {
+          url = url.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, 'https://rameez-kitchen-backend.onrender.com');
+        }
+        return url;
+      })
+      .filter(Boolean);
+  }
+  if (maxCustomerLimit) {
+    restaurantProfile.maxCustomerLimit = Number(maxCustomerLimit) || 500;
+  }
+  await saveStoreSettingsToDb();
+  io.emit('restaurant:banners_updated', restaurantProfile.banners);
+  io.emit('restaurant:profile_updated', restaurantProfile);
+  return res.json({
+    success: true,
+    banners: restaurantProfile.banners,
+    maxCustomerLimit: restaurantProfile.maxCustomerLimit,
+    restaurantProfile,
+  });
 });
 
 // ---------- Executive Directory Vault (Customers & Driver Fleet) ----------
