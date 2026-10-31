@@ -22,6 +22,7 @@ class HomeScreen extends StatefulWidget {
   final String initialName;
   final String initialPhone;
   final String initialEmail;
+  final String initialAvatar;
 
   const HomeScreen({
     super.key,
@@ -30,6 +31,7 @@ class HomeScreen extends StatefulWidget {
     this.initialName = "Valued Customer",
     this.initialPhone = "",
     this.initialEmail = "",
+    this.initialAvatar = "",
   });
 
   @override
@@ -271,6 +273,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     customerName = widget.initialName.isNotEmpty ? widget.initialName : "Valued Customer";
     customerPhone = widget.initialPhone;
     customerEmail = widget.initialEmail;
+    if (widget.initialAvatar.isNotEmpty) {
+      customerAvatar = _sanitizeImageUrl(widget.initialAvatar, isRestaurant: false);
+    }
 
     _cartBounceController = AnimationController(
       vsync: this,
@@ -339,6 +344,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     if (widget.initialEmail.isNotEmpty && widget.initialEmail != oldWidget.initialEmail) {
       setState(() => customerEmail = widget.initialEmail);
+    }
+    if (widget.initialAvatar.isNotEmpty && widget.initialAvatar != oldWidget.initialAvatar) {
+      setState(() => customerAvatar = _sanitizeImageUrl(widget.initialAvatar, isRestaurant: false));
     }
   }
 
@@ -1030,119 +1038,135 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 const SizedBox(height: 14),
                 Flexible(
                   child: SingleChildScrollView(
-                    child: Column(
-                      children: offersList.map((o) {
-                        final code = o['code']?.toString() ?? 'OFFER';
-                        final disc = (o['discount'] as num?)?.toInt() ?? 20;
-                        final desc = o['description']?.toString() ?? 'Special discount';
-                        final isThisApplied = appliedCoupon == code;
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: offersList.map((o) {
+                          final code = o['code']?.toString() ?? 'OFFER';
+                          final disc = (o['discount'] as num?)?.toInt() ?? 20;
+                          final desc = o['description']?.toString() ?? 'Special discount';
+                          final isThisApplied = appliedCoupon == code;
 
-                        return InkWell(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            if (isThisApplied) {
-                              onApply('', 0);
-                            } else {
-                              onApply(code, disc);
-                            }
-                            Navigator.of(dialogCtx).pop();
-                          },
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
+                          return Container(
+                            width: double.infinity,
                             margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: isDarkMode ? const Color(0xFF2A2A2E) : const Color(0xFFF9FAFB),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: isThisApplied ? Colors.green : (isDarkMode ? Colors.white12 : Colors.grey.shade300),
+                                color: isThisApplied ? const Color(0xFFFF5200) : (isDarkMode ? Colors.white12 : Colors.grey.shade300),
                                 width: isThisApplied ? 2 : 1,
                               ),
                             ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFF5200).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFFFF5200), size: 24),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
+                            child: Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              child: InkWell(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  if (isThisApplied) {
+                                    onApply('', 0);
+                                  } else {
+                                    onApply(code, disc);
+                                  }
+                                  Navigator.of(dialogCtx).pop();
+                                },
+                                borderRadius: BorderRadius.circular(16),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Wrap(
-                                        spacing: 8,
-                                        crossAxisAlignment: WrapCrossAlignment.center,
-                                        children: [
-                                          Text(
-                                            code,
-                                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.8),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: Colors.green.withValues(alpha: 0.15),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              'SAVE ₹$disc',
-                                              style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w900),
-                                            ),
-                                          ),
-                                        ],
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFF5200).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFFFF5200), size: 24),
                                       ),
-                                      const SizedBox(height: 5),
-                                      Text(
-                                        desc,
-                                        softWrap: true,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
-                                          fontSize: 12,
-                                          height: 1.25,
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    code,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.8),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.green.withValues(alpha: 0.15),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    'SAVE ₹$disc',
+                                                    style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w900),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              desc,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
+                                                fontSize: 12,
+                                                height: 1.25,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      SizedBox(
+                                        height: 36,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: isThisApplied ? Colors.green : const Color(0xFFFF5200),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                                          ),
+                                          onPressed: () {
+                                            HapticFeedback.lightImpact();
+                                            if (isThisApplied) {
+                                              onApply('', 0);
+                                            } else {
+                                              onApply(code, disc);
+                                            }
+                                            Navigator.of(dialogCtx).pop();
+                                          },
+                                          child: Text(
+                                            isThisApplied ? 'APPLIED' : 'APPLY',
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                SizedBox(
-                                  height: 38,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isThisApplied ? Colors.green : const Color(0xFFFF5200),
-                                      foregroundColor: Colors.white,
-                                      elevation: isThisApplied ? 0 : 2,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                                    ),
-                                    onPressed: () {
-                                      HapticFeedback.lightImpact();
-                                      if (isThisApplied) {
-                                        onApply('', 0);
-                                      } else {
-                                        onApply(code, disc);
-                                      }
-                                      Navigator.of(dialogCtx).pop();
-                                    },
-                                    child: Text(
-                                      isThisApplied ? 'APPLIED' : 'APPLY',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ),
@@ -1461,13 +1485,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               // Option 1: Google Pay (GPay)
               _buildPaymentOptionTile(
                 icon: Icons.account_balance_wallet_rounded,
-                iconColor: Colors.blue,
-                bgColor: Colors.blue.shade50,
-                borderColor: Colors.blue.shade300,
                 title: 'Google Pay (GPay)',
                 subtitle: 'Instant 1-Tap UPI Pay & Confirm Order',
                 badgeText: '₹$finalPayableRupees >',
-                badgeColor: Colors.blue,
                 onTap: () {
                   Navigator.pop(pCtx);
                   _processCheckoutAndPlaceOrder(
@@ -1482,13 +1502,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               // Option 2: PhonePe UPI
               _buildPaymentOptionTile(
                 icon: Icons.payment_rounded,
-                iconColor: Colors.purple,
-                bgColor: Colors.purple.shade50,
-                borderColor: Colors.purple.shade300,
                 title: 'PhonePe UPI',
                 subtitle: 'Instant 1-Tap UPI Pay & Confirm Order',
                 badgeText: '₹$finalPayableRupees >',
-                badgeColor: Colors.purple,
                 onTap: () {
                   Navigator.pop(pCtx);
                   _processCheckoutAndPlaceOrder(
@@ -1500,62 +1516,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 },
               ),
 
-              // Option 3: Paytm UPI
-              _buildPaymentOptionTile(
-                icon: Icons.credit_card_rounded,
-                iconColor: Colors.cyan.shade800,
-                bgColor: Colors.cyan.shade50,
-                borderColor: Colors.cyan.shade400,
-                title: 'Paytm UPI',
-                subtitle: 'Instant 1-Tap UPI Pay & Confirm Order',
-                badgeText: '₹$finalPayableRupees >',
-                badgeColor: Colors.cyan.shade800,
-                onTap: () {
-                  Navigator.pop(pCtx);
-                  _processCheckoutAndPlaceOrder(
-                    paymentMethod: 'UPI (Paytm)',
-                    upiApp: 'paytm',
-                    finalPayableRupees: finalPayableRupees,
-                    sheetContext: context,
-                  );
-                },
-              ),
-
-              // Option 4: Other UPI Apps
-              _buildPaymentOptionTile(
-                icon: Icons.open_in_new_rounded,
-                iconColor: const Color(0xFFFF5200),
-                bgColor: const Color(0xFFFF5200).withValues(alpha: 0.1),
-                borderColor: const Color(0xFFFF5200).withValues(alpha: 0.4),
-                title: 'Other UPI Apps',
-                subtitle: 'BHIM, Cred, Amazon Pay, Axis UPI',
-                badgeText: '₹$finalPayableRupees >',
-                badgeColor: const Color(0xFFFF5200),
-                onTap: () {
-                  Navigator.pop(pCtx);
-                  _processCheckoutAndPlaceOrder(
-                    paymentMethod: 'UPI (Direct)',
-                    upiApp: null,
-                    finalPayableRupees: finalPayableRupees,
-                    sheetContext: context,
-                  );
-                },
-              ),
-
-              // Option 5: Rameez Digital Wallet
+              // Option 3: Rameez Digital Wallet
               Builder(
                 builder: (wCtx) {
                   final walletBal = wCtx.watch<WalletProvider>().balance;
                   final hasFunds = walletBal >= finalPayableRupees;
                   return _buildPaymentOptionTile(
-                    icon: Icons.account_balance_wallet_rounded,
-                    iconColor: hasFunds ? Colors.green : Colors.grey,
-                    bgColor: hasFunds ? Colors.green.shade50 : Colors.grey.shade100,
-                    borderColor: hasFunds ? Colors.green.shade400 : Colors.grey.shade300,
+                    icon: Icons.wallet_rounded,
                     title: 'Rameez Digital Wallet',
-                    subtitle: hasFunds ? 'Balance: ₹${walletBal.toInt()} • Instant Pay' : 'Available: ₹${walletBal.toInt()} (Insufficient funds)',
-                    badgeText: '₹$finalPayableRupees >',
-                    badgeColor: hasFunds ? Colors.green.shade700 : Colors.grey.shade400,
+                    subtitle: hasFunds
+                        ? 'Balance: ₹${walletBal.toInt()} • Instant Pay'
+                        : 'Available: ₹${walletBal.toInt()} (Insufficient funds)',
+                    badgeText: hasFunds ? '₹$finalPayableRupees >' : 'LOW BAL',
+                    isEnabled: hasFunds,
                     onTap: hasFunds
                         ? () {
                             Navigator.pop(pCtx);
@@ -1574,16 +1547,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 },
               ),
 
-              // Option 6: Cash on Delivery (Cash)
+              // Option 4: Cash on Delivery (COD)
               _buildPaymentOptionTile(
                 icon: Icons.handshake_rounded,
-                iconColor: Colors.blueGrey,
-                bgColor: Colors.blueGrey.shade50,
-                borderColor: Colors.blueGrey.shade300,
                 title: 'Cash on Delivery (COD)',
                 subtitle: 'Pay cash or scan driver QR at doorstep',
                 badgeText: 'CONFIRM >',
-                badgeColor: Colors.blueGrey.shade800,
                 onTap: () {
                   Navigator.pop(pCtx);
                   _processCheckoutAndPlaceOrder(
@@ -1602,52 +1571,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildPaymentOptionTile({
     required IconData icon,
-    required Color iconColor,
-    required Color bgColor,
-    required Color borderColor,
     required String title,
     required String subtitle,
     required String badgeText,
-    required Color badgeColor,
     required VoidCallback onTap,
+    bool isEnabled = true,
   }) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    const brandOrange = Color(0xFFFF5200);
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: isDarkMode ? const Color(0xFF2A2A2E) : Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: borderColor, width: 1.5),
+            border: Border.all(
+              color: isDarkMode ? const Color(0xFF38383E) : const Color(0xFFE5E7EB),
+              width: 1.5,
+            ),
             boxShadow: [
-              BoxShadow(color: borderColor.withValues(alpha: 0.08), blurRadius: 6, offset: const Offset(0, 2)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 2)),
             ],
           ),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
-                child: Icon(icon, color: iconColor, size: 20),
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: brandOrange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: brandOrange, size: 22),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                    const SizedBox(height: 2),
                     Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(8)),
-                child: Text(badgeText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isEnabled ? brandOrange : Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  badgeText,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -1779,7 +1760,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     UniversalImagePicker.pickImage(
       captureMode: captureMode,
       onSelected: (imageUrl, fileName) {
-        setState(() => customerAvatar = imageUrl);
+        final safeUrl = _sanitizeImageUrl(imageUrl, isRestaurant: false);
+        setState(() => customerAvatar = safeUrl);
+        try {
+          context.read<AuthProvider>().updateProfile(avatar: safeUrl);
+        } catch (_) {}
         _syncProfileWithServer();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1830,7 +1815,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 return InkWell(
                   onTap: () {
                     Navigator.pop(ctx);
-                    setState(() => customerAvatar = item['url']!);
+                    final safeUrl = item['url']!;
+                    setState(() => customerAvatar = safeUrl);
+                    try {
+                      context.read<AuthProvider>().updateProfile(avatar: safeUrl);
+                    } catch (_) {}
                     _syncProfileWithServer();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(backgroundColor: Colors.green.shade700, content: Text('✓ Selected ${item['name']} avatar!')),
@@ -1883,7 +1872,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onPressed: () {
               final val = ctrl.text.trim();
               if (val.isNotEmpty) {
-                setState(() => customerAvatar = val);
+                final safeUrl = _sanitizeImageUrl(val, isRestaurant: false);
+                setState(() => customerAvatar = safeUrl);
+                try {
+                  context.read<AuthProvider>().updateProfile(avatar: safeUrl);
+                } catch (_) {}
                 _syncProfileWithServer();
               }
               Navigator.pop(ctx);
@@ -3596,6 +3589,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     }
     return url;
+  }
+
+  ImageProvider _getAvatarImageProvider(String? rawUrl) {
+    final url = _sanitizeImageUrl(rawUrl, isRestaurant: false);
+    if (url.startsWith('data:image')) {
+      try {
+        final commaIdx = url.indexOf(',');
+        if (commaIdx != -1) {
+          final b64 = url.substring(commaIdx + 1);
+          return MemoryImage(base64Decode(b64));
+        }
+      } catch (_) {}
+    }
+    return NetworkImage(url);
   }
 
   Widget _branchTile(String name, String hours, String rating, String img) {
@@ -5854,7 +5861,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   children: [
                     CircleAvatar(
                       radius: 36,
-                      backgroundImage: NetworkImage(_sanitizeImageUrl(customerAvatar, isRestaurant: false)),
+                      backgroundImage: _getAvatarImageProvider(customerAvatar),
                       onBackgroundImageError: (_, _) => const Icon(Icons.person, size: 36),
                     ),
                     Positioned(

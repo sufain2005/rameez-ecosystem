@@ -89,7 +89,7 @@ class AuthProvider extends ChangeNotifier {
     final cleanEmail = email == null ? null : _cleanEmail(email);
     if (name != null && cleanName == null) return _fail('Please enter a valid name.');
     if (email != null && cleanEmail == null) return _fail('Please enter a valid email address.');
-    if (avatar != null && !_isHttps(avatar)) return _fail('Invalid profile picture link.');
+    if (avatar != null && !_isValidAvatar(avatar)) return _fail('Invalid profile picture link.');
 
     if (cleanName != null) _customerName = cleanName;
     if (cleanEmail != null) _customerEmail = cleanEmail;
@@ -188,7 +188,7 @@ class AuthProvider extends ChangeNotifier {
           _customerPhone = _normalizePhone(m['phone']?.toString() ?? '') ?? '';
           _customerEmail = _cleanEmail(m['email']?.toString() ?? '') ?? '';
           final a = m['avatar']?.toString() ?? '';
-          if (_isHttps(a)) _customerAvatar = a;
+          if (_isValidAvatar(a)) _customerAvatar = a;
           final addr = m['address']?.toString() ?? '';
           if (addr.isNotEmpty) _customerAddress = addr;
         }
@@ -281,7 +281,13 @@ class AuthProvider extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  static bool _isHttps(String v) => v.trim().toLowerCase().startsWith('https://');
+  static bool _isValidAvatar(String v) {
+    final s = v.trim().toLowerCase();
+    return s.startsWith('https://') ||
+        s.startsWith('http://') ||
+        s.startsWith('data:image/') ||
+        s.startsWith('/');
+  }
 
   /// +91XXXXXXXXXX. Accepts 10 digits, 0+10 digits, or a full +country number.
   static String? _normalizePhone(String raw) {

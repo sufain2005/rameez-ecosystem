@@ -694,7 +694,7 @@ app.post(['/auth/verify-otp', '/api/auth/verify-otp'], (req, res) => {
 
 // ---------- CUSTOMER PROFILE ----------
 app.get(['/customer/profile', '/api/customer/profile'], (req, res) => {
-  const phone = req.query.phone ? normalizePhone(req.query.phone) : null;
+  const phone = req.query.phone ? normalizePhone(req.query.phone) : (customerDirectory[0]?.phone || null);
   if (phone) {
     let cust = customerDirectory.find((c) => normalizePhone(c.phone) === phone);
     if (!cust) {
@@ -715,8 +715,8 @@ app.get(['/customer/profile', '/api/customer/profile'], (req, res) => {
     }
     return res.json(cust);
   }
-  return res.json({
-    phone: '',
+  return res.json(customerDirectory[0] || {
+    phone: '+919654321076',
     name: 'Valued Customer',
     email: '',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400',
@@ -731,15 +731,15 @@ app.get(['/customer/profile', '/api/customer/profile'], (req, res) => {
 });
 
 app.post(['/customer/profile', '/api/customer/profile'], (req, res) => {
-  let phone = req.body.phone ? normalizePhone(req.body.phone) : null;
+  let phone = req.body.phone ? normalizePhone(req.body.phone) : (customerDirectory[0]?.phone || '+919654321076');
   const name = sanitizeText(req.body.name);
   const email = sanitizeText(req.body.email);
-  const avatar = sanitizeText(req.body.avatar);
+  let avatar = sanitizeText(req.body.avatar);
   const address = sanitizeText(req.body.address);
   const isGoldMember = Boolean(req.body.isGoldMember);
 
-  if (!phone) {
-    return res.status(400).json({ success: false, error: 'Phone number is required to update profile' });
+  if (avatar && (avatar.includes('localhost') || avatar.includes('127.0.0.1'))) {
+    avatar = avatar.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, 'https://rameez-kitchen-backend.onrender.com');
   }
 
   let customer = customerDirectory.find((c) => normalizePhone(c.phone) === phone);

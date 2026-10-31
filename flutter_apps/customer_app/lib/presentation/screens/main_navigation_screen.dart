@@ -26,6 +26,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       initialName: auth.customerName,
       initialPhone: auth.customerPhone,
       initialEmail: auth.customerEmail,
+      initialAvatar: auth.customerAvatar,
     );
   }
 }
