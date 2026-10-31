@@ -1596,7 +1596,7 @@ app.post(['/settings/payment-update', '/api/settings/payment-update'], (req, res
   return res.json({ success: true, paymentSettings });
 });
 
-app.post(['/admin/profile', '/api/admin/profile'], (req, res) => {
+app.post(['/admin/profile', '/api/admin/profile'], async (req, res) => {
   const { currentPassword, newPassword, username, email, phone, ownerName, avatar, banner, tagline, cuisine, operatingHours } = req.body;
   const clientIp = req.ip || req.connection?.remoteAddress || '127.0.0.1';
   const userAgent = req.headers['user-agent'] || '';
