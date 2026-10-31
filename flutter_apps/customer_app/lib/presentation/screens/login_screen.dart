@@ -369,6 +369,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             validator: _validateName,
             decoration: _buildInputDecoration(
               label: 'Your Full Name',
+              hintText: 'e.g., Mohammed Sufain',
               icon: Icons.person_outline_rounded,
             ),
             onTapOutside: (_) => FocusScope.of(context).unfocus(),
@@ -389,6 +390,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             validator: _validatePhone,
             decoration: _buildInputDecoration(
               label: 'Mobile Number',
+              hintText: '9654321076',
               icon: Icons.phone_android_rounded,
               prefix: Container(
                 width: 62,

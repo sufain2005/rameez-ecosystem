@@ -44,10 +44,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool isGoldMember = false;
 
   // Address
-  String houseNo = "Flat 204";
-  String streetName = "Near Bus Stop";
-  String areaName = "60 Feet Ring Road";
-  String deliveryAddress = "Flat 204, Near Bus Stop, 60 Feet Ring Road";
+  String houseNo = "104P/P-78";
+  String streetName = "Lenin Nagar";
+  String areaName = "Nittuvalli";
+  String deliveryAddress = "104P/P-78, Lenin Nagar, Nittuvalli";
 
   // Customer Profile Information
   late String customerName;
@@ -955,6 +955,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                           decoration: InputDecoration(
                             labelText: 'Flat / House No',
+                            hintText: 'e.g., 104P/P-78, Sunshine Apts',
                             prefixIcon: const Icon(Icons.home_outlined, color: Color(0xFFFF5200)),
                             filled: true,
                             fillColor: const Color(0xFFF8F9FA),
@@ -969,6 +970,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                           decoration: InputDecoration(
                             labelText: 'Street Name',
+                            hintText: 'e.g., Lenin Nagar, 60 Feet Ring Road',
                             prefixIcon: const Icon(Icons.signpost_outlined, color: Color(0xFFFF5200)),
                             filled: true,
                             fillColor: const Color(0xFFF8F9FA),
@@ -983,6 +985,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                           decoration: InputDecoration(
                             labelText: 'Area / Landmark',
+                            hintText: 'e.g., Nittuvalli Circle, Near Bus Stop',
                             prefixIcon: const Icon(Icons.place_outlined, color: Color(0xFFFF5200)),
                             filled: true,
                             fillColor: const Color(0xFFF8F9FA),

@@ -403,6 +403,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: nameCtrl,
                   decoration: InputDecoration(
                     labelText: 'Full Name',
+                    hintText: 'e.g., Mohammed Sufain',
                     prefixIcon: const Icon(Icons.person_rounded, color: AppColors.primaryOrange),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -413,6 +414,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: phoneCtrl,
                   decoration: InputDecoration(
                     labelText: 'Mobile Number',
+                    hintText: 'e.g., 9654321076',
                     prefixIcon: const Icon(Icons.phone_rounded, color: AppColors.primaryOrange),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -423,6 +425,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: emailCtrl,
                   decoration: InputDecoration(
                     labelText: 'Email Address',
+                    hintText: 'e.g., customer@example.com',
                     prefixIcon: const Icon(Icons.email_rounded, color: AppColors.primaryOrange),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -434,6 +437,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   maxLines: 2,
                   decoration: InputDecoration(
                     labelText: 'Default Delivery Address',
+                    hintText: 'e.g., Flat 104P/P-78, Lenin Nagar, Nittuvalli, Davanagere',
                     prefixIcon: const Icon(Icons.location_on_rounded, color: AppColors.primaryOrange),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -611,7 +615,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Tag (Home / Work / Other)')),
             const SizedBox(height: 10),
-            TextField(controller: fullAddrCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Complete Address & Landmark')),
+            TextField(
+              controller: fullAddrCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Complete Address & Landmark',
+                hintText: 'e.g., Flat 104P/P-78, Lenin Nagar, Nittuvalli, Davanagere',
+              ),
+            ),
           ],
         ),
         actions: [

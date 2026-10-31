@@ -352,6 +352,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               validator: _validateName,
               decoration: _inputDecoration(
                 label: 'Full Name',
+                hint: 'e.g., Mohammed Sufain',
                 icon: Icons.person_outline_rounded,
               ).copyWith(counterText: ''),
             ),
