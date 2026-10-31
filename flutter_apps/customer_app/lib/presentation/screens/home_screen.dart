@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/utils/universal_image_picker.dart';
 import '../../logic/wallet_provider.dart';
@@ -23,6 +24,7 @@ class HomeScreen extends StatefulWidget {
   final String initialPhone;
   final String initialEmail;
   final String initialAvatar;
+  final String initialAddress;
 
   const HomeScreen({
     super.key,
@@ -32,6 +34,7 @@ class HomeScreen extends StatefulWidget {
     this.initialPhone = "",
     this.initialEmail = "",
     this.initialAvatar = "",
+    this.initialAddress = "",
   });
 
   @override
@@ -42,6 +45,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late int _selectedTab;
   bool isDarkMode = false;
   bool isGoldMember = false;
+  bool _isLocationAutoSet = false;
+  bool _hideLocationBanner = false;
 
   // Address
   String houseNo = "104P/P-78";
@@ -288,6 +293,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (widget.initialAvatar.isNotEmpty) {
       customerAvatar = _sanitizeImageUrl(widget.initialAvatar, isRestaurant: false);
     }
+    if (widget.initialAddress.isNotEmpty && widget.initialAddress != 'Setup Delivery Location') {
+      deliveryAddress = widget.initialAddress;
+      if (deliveryAddress.contains('Live GPS') || deliveryAddress.contains('GPS')) {
+        _isLocationAutoSet = true;
+      }
+    }
 
     _cartBounceController = AnimationController(
       vsync: this,
@@ -300,6 +311,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     fetchInitialData();
     initSocketConnection();
     _requestAndEnableLiveLocation(showNotification: false);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndPromptInitialAddress();
+    });
 
     _heroBannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (_heroBannerPageCtrl.hasClients && heroBanners.length > 1) {
@@ -778,6 +793,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           streetName = capturedStreet;
           areaName = capturedArea;
           deliveryAddress = locText;
+          _isLocationAutoSet = true;
         });
 
         _syncProfileWithServer();
@@ -816,12 +832,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _openAddressModal() {
+  Future<void> _checkAndPromptInitialAddress() async {
+    try {
+      const storage = FlutterSecureStorage();
+      final hasPrompted = await storage.read(key: 'rk_has_prompted_address_v4');
+      if (hasPrompted == 'true') {
+        return;
+      }
+      // Wait a moment for page widgets to render smoothly
+      await Future.delayed(const Duration(milliseconds: 1200));
+      if (!mounted) return;
+
+      // If location is already auto-set, don't interrupt
+      if (_isLocationAutoSet) return;
+
+      // Mark prompted so customer is not asked repeatedly on refresh
+      await storage.write(key: 'rk_has_prompted_address_v4', value: 'true');
+
+      if (mounted) {
+        _openAddressModal(isInitialPrompt: true);
+      }
+    } catch (e) {
+      debugPrint('[ADDRESS_PROMPT] $e');
+    }
+  }
+
+  void _openAddressModal({bool startWithManual = false, bool isInitialPrompt = false}) {
     final h = TextEditingController(text: houseNo);
     final s = TextEditingController(text: streetName);
     final a = TextEditingController(text: areaName);
     final formKey = GlobalKey<FormState>();
-    bool showManualForm = false;
+    bool showManualForm = startWithManual;
 
     showModalBottomSheet(
       context: context,
@@ -851,7 +892,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(3)),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Container(
@@ -862,14 +903,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       child: const Icon(Icons.location_on_rounded, color: Color(0xFFFF5200), size: 26),
                     ),
-                    const SizedBox(width: 16),
-                    const Text('Delivery Address', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isInitialPrompt ? 'Where should we deliver?' : 'Delivery Address',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isInitialPrompt
+                                ? 'Auto-detect live GPS or enter details for 25-min delivery'
+                                : 'Select or update your delivery address',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 if (!showManualForm) ...[
-                  // Option 1: Live Location
+                  // Option 1: Live Location (Auto Set)
                   InkWell(
                     onTap: () async {
                       HapticFeedback.lightImpact();
@@ -880,33 +938,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.green.shade300, width: 1.5),
+                        border: Border.all(color: Colors.green.shade400, width: 1.5),
                         borderRadius: BorderRadius.circular(16),
-                        color: Colors.green.withValues(alpha: 0.05),
+                        color: Colors.green.withValues(alpha: 0.06),
                       ),
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                            child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 20),
+                            child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 22),
                           ),
-                          const SizedBox(width: 16),
-                          const Expanded(
+                          const SizedBox(width: 14),
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Enable Live Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.green)),
-                                SizedBox(height: 4),
-                                Text('Automatically fetch & save your current location', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                Row(
+                                  children: [
+                                    const Text('Enable Live Location',
+                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.green)),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text('AUTO SET',
+                                          style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                const Text('Automatically fetch & save your current GPS location',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey)),
                               ],
                             ),
                           ),
+                          const Icon(Icons.bolt_rounded, color: Colors.green, size: 20),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   
                   // Option 2: Add Manually
                   InkWell(
@@ -926,24 +1001,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(color: Colors.grey.shade200, shape: BoxShape.circle),
-                            child: const Icon(Icons.edit_location_alt_outlined, color: Colors.black87, size: 20),
+                            child: const Icon(Icons.edit_location_alt_outlined, color: Colors.black87, size: 22),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 14),
                           const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Add Address Manually', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87)),
+                                Text('Add Address Manually',
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.black87)),
                                 SizedBox(height: 4),
-                                Text('Type in your exact house/flat and street', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                Text('Type in flat/door no, street name & landmarks',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey)),
                               ],
                             ),
                           ),
-                          const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
                         ],
                       ),
                     ),
                   ),
+
+                  if (isInitialPrompt) ...[
+                    const SizedBox(height: 14),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Skip for now, explore menu first',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
                 ] else ...[
                   // Manual Entry Form
                   Form(
@@ -1020,6 +1110,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 streetName = s.text.trim();
                                 areaName = a.text.trim();
                                 deliveryAddress = "$houseNo, $streetName, $areaName";
+                                _isLocationAutoSet = true;
                               });
                               
                               _syncProfileWithServer(); // Save to Database Automatically
@@ -2861,7 +2952,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Deliver to', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500)),
+                      Row(
+                        children: [
+                          const Text('Deliver to', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 6),
+                          if (_isLocationAutoSet)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F8A65).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('LIVE GPS', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Color(0xFF0F8A65))),
+                            ),
+                        ],
+                      ),
                       Text(
                         deliveryAddress.isNotEmpty ? deliveryAddress : 'Select delivery location',
                         style: TextStyle(
@@ -2878,6 +2983,65 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
+
+          // ── Quick Location Action Banner (if not auto-set) ──
+          if (!_isLocationAutoSet && !_hideLocationBanner) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F8A65).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF0F8A65).withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.gps_fixed_rounded, size: 16, color: Color(0xFF0F8A65)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Auto-set address for 25-min delivery',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F8A65)),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _requestAndEnableLiveLocation(showNotification: true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F8A65),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'ENABLE GPS',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () => _openAddressModal(startWithManual: true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'MANUAL',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => setState(() => _hideLocationBanner = true),
+                    child: const Icon(Icons.close, size: 14, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           TextField(
             controller: _searchCtrl,
